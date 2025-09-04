@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eco-Match</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    .term-card { @apply p-4 bg-green-300 rounded shadow cursor-move mb-2; }
+    .def-card { @apply p-4 bg-blue-300 rounded shadow mb-2; }
+    .correct { @apply bg-green-500 text-white animate-pulse; }
+    .incorrect { @apply bg-red-500 text-white animate-shake; }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20%, 60% { transform: translateX(-5px); }
+        40%, 80% { transform: translateX(5px); }
+    }
+    .animate-shake { animation: shake 0.5s; }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+
+<h1 class="text-3xl font-bold mb-4">Eco-Match</h1>
+
+<div class="flex justify-between w-full max-w-4xl mb-4">
+    <div class="text-xl font-semibold">Nivel: <span id="level">1</span></div>
+    <div class="text-xl font-semibold">Puntuación: <span id="score">0</span></div>
+    <div class="text-xl font-semibold">Intentos restantes: <span id="attempts">2</span></div>
+</div>
+
+<div class="flex flex-col md:flex-row justify-between w-full max-w-4xl">
+    <div id="terms" class="w-full md:w-1/2 p-2"></div>
+    <div id="definitions" class="w-full md:w-1/2 p-2"></div>
+</div>
+
+<div class="flex justify-center mt-4 space-x-4">
+    <button id="nextLevelBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Siguiente Nivel</button>
+    <button id="resetBtn" class="bg-red-400 text-white px-4 py-2 rounded hover:bg-red-500">Reiniciar Juego</button>
+</div>
+
+<script>
+const levels = [
+    [
+        { term: "Fotosíntesis", definition: "Proceso por el cual las plantas producen su alimento usando luz solar" },
+        { term: "Biodiversidad", definition: "Variedad de seres vivos en un ecosistema" },
+        { term: "Ecosistema", definition: "Comunidad de seres vivos y su entorno" },
+        { term: "Reciclaje", definition: "Proceso de convertir desechos en nuevos materiales" },
+        { term: "Contaminación", definition: "Presencia de sustancias nocivas en el ambiente" }
+    ],
+    [
+        { term: "Deforestación", definition: "Eliminación de bosques para otros usos" },
+        { term: "Especies invasoras", definition: "Organismos que alteran el ecosistema al ser introducidos" },
+        { term: "Cadena alimentaria", definition: "Secuencia de organismos donde cada uno se alimenta del anterior" },
+        { term: "Suelo fértil", definition: "Suelo rico en nutrientes que favorece el crecimiento vegetal" },
+        { term: "Efecto invernadero", definition: "Retención de calor en la atmósfera por gases" },
+        { term: "Sostenibilidad", definition: "Uso responsable de recursos para no agotarlos" },
+        { term: "Bioma", definition: "Área geográfica con flora y fauna características" },
+        { term: "Erosión", definition: "Desgaste del suelo por agua, viento o actividades humanas" }
+    ],
+    [
+        { term: "Humus", definition: "Materia orgánica del suelo que mejora su fertilidad" },
+        { term: "Mitigación", definition: "Acciones para reducir impactos ambientales" },
+        { term: "Agroforestería", definition: "Integración de árboles y cultivos en un mismo terreno" },
+        { term: "Especies endémicas", definition: "Organismos que solo existen en un lugar específico" },
+        { term: "Polinización", definition: "Transferencia de polen para la reproducción de plantas" },
+        { term: "Recursos renovables", definition: "Recursos que pueden regenerarse naturalmente" },
+        { term: "Recursos no renovables", definition: "Recursos que no se regeneran o tardan mucho en hacerlo" },
+        { term: "Biodegradación", definition: "Descomposición de materiales por organismos" },
+        { term: "Captura de carbono", definition: "Proceso de retener CO₂ para reducir emisiones" },
+        { term: "Eutrofización", definition: "Exceso de nutrientes en cuerpos de agua que genera algas" }
+    ]
+];
+
+let currentLevel = 0;
+let score = 0;
+let attempts = 2;
+let matches = 0;
+
+const levelSpan = document.getElementById('level');
+const scoreSpan = document.getElementById('score');
+const attemptsSpan = document.getElementById('attempts');
+const termsDiv = document.getElementById('terms');
+const definitionsDiv = document.getElementById('definitions');
+const nextLevelBtn = document.getElementById('nextLevelBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+function loadLevel(levelIndex) {
+    const levelData = levels[levelIndex];
+    matches = 0;
+    attempts = 2;
+    levelSpan.textContent = levelIndex + 1;
+    attemptsSpan.textContent = attempts;
+    nextLevelBtn.disabled = true;
+
+    termsDiv.innerHTML = '';
+    definitionsDiv.innerHTML = '';
+
+    const terms = [...levelData];
+    const definitions = [...levelData];
+
+    shuffleArray(terms);
+    shuffleArray(definitions);
+
+    terms.forEach(item => {
+        const termCard = document.createElement('div');
+        termCard.className = 'term-card';
+        termCard.draggable = true;
+        termCard.textContent = item.term;
+        termCard.dataset.term = item.term;
+        termCard.addEventListener('dragstart', dragStart);
+        termsDiv.appendChild(termCard);
+    });
+
+    definitions.forEach(item => {
+        const defCard = document.createElement('div');
+        defCard.className = 'def-card';
+        defCard.textContent = item.definition;
+        defCard.dataset.term = item.term;
+        defCard.addEventListener('dragover', dragOver);
+        defCard.addEventListener('drop', drop);
+        definitionsDiv.appendChild(defCard);
+    });
+}
+
+let draggedTerm = null;
+
+function dragStart(e) {
+    draggedTerm = e.target;
+}
+
+function dragOver(e) {
+    e.preventDefault();
+}
+
+function drop(e) {
+    e.preventDefault();
+    const targetTerm = e.target.dataset.term;
+
+    if (draggedTerm.dataset.term === targetTerm) {
+        e.target.classList.add('correct');
+        draggedTerm.style.visibility = 'hidden';
+        score += 10;
+        matches++;
+        scoreSpan.textContent = score;
+        if (matches === levels[currentLevel].length) {
+            nextLevelBtn.disabled = false;
+        }
+    } else {
+        e.target.classList.add('incorrect');
+        setTimeout(() => e.target.classList.remove('incorrect'), 500);
+        score -= 2;
+        attempts--;
+        attemptsSpan.textContent = attempts;
+        scoreSpan.textContent = score;
+        if (attempts <= 0) {
+            alert("Juego terminado. Has agotado tus intentos.");
+            loadLevel(currentLevel);
+        }
+    }
+}
+
+nextLevelBtn.addEventListener('click', () => {
+    if (currentLevel < levels.length - 1) {
+        currentLevel++;
+        loadLevel(currentLevel);
+    } else {
+        alert("¡Felicidades! Has completado todos los niveles.");
+    }
+});
+
+resetBtn.addEventListener('click', () => {
+    currentLevel = 0;
+    score = 0;
+    loadLevel(currentLevel);
+});
+
+loadLevel(currentLevel);
+</script>
+
+</body>
+</html>
